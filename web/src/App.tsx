@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
-import "./App.css";
 import { api } from "./api";
+import { AppShell, Burger, Text } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
 
 function App() {
-  const [count, setCount] = useState(0);
+  const [opened, { toggle }] = useDisclosure();
   const [greeting, setGreeting] = useState<string>("");
   const [error, setError] = useState<string>("");
 
@@ -20,10 +19,25 @@ function App() {
   }, []);
 
   return (
-    <>
-      <p>{greeting}</p>
-      <p>{error}</p>
-    </>
+    <AppShell
+      header={{ height: 60 }}
+      navbar={{
+        width: 300,
+        breakpoint: "sm",
+        collapsed: { mobile: !opened },
+      }}
+      padding="md"
+    >
+      <AppShell.Header>
+        <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+        <div>Logo</div>
+      </AppShell.Header>
+      <AppShell.Navbar p="md">Navbar</AppShell.Navbar>
+      <AppShell.Main>
+        <Text>{greeting}</Text>
+        <Text>{error}</Text>
+      </AppShell.Main>
+    </AppShell>
   );
 }
 

@@ -1,0 +1,18 @@
+version: v1
+plugins:
+  - plugin: go
+    out: ../backend/pb
+    opt:
+      - paths=source_relative
+  - plugin: go-grpc
+    out: ../backend/pb
+    opt:
+      - paths=source_relative
+  - plugin: grpc-gateway
+    out: ../backend/pb
+    opt:
+      - paths=source_relative
+      - generate_unbound_methods=true
+  - plugin: buf.build/community/stephenh-ts-proto
+    out: ../web/src/pb
+    

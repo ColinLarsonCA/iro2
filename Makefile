@@ -1,16 +1,12 @@
+.PHONY: web pb
+
 be:
 	docker compose up --build -d
 
 web:
-	npm run web
+	cd web; npm run dev
 
-ios:
-	npm run ios
-
-android:
-	npm run android
-
-protogen:
+pb:
+	rm -rf api/*
 	rm -rf backend/pb/*
-	mkdir -p backend/pb
-	protoc --go_out=backend/pb --go-grpc_out=backend/pb --proto_path=protos protos/*.proto
+	cd protos; buf generate

@@ -1,4 +1,4 @@
-import { GetGreetingRequest, GetGreetingResponse } from "./pb/greeting";
+import { GetGreetingRequest, GetGreetingResponse } from "../pb/greeting";
 
 class GreetingService {
   service: string = "greeting.GreetingService";

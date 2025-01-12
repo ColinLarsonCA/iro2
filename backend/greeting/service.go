@@ -17,7 +17,7 @@ func NewService(db *sql.DB) pb.GreetingServiceServer {
 	return &service{db: db}
 }
 
-func (s *service) GetGreeting(ctx context.Context, in *pb.GetGreetingRequest) (*pb.GetGreetingResponse, error) {
+func (s *service) GetGreeting(ctx context.Context, req *pb.GetGreetingRequest) (*pb.GetGreetingResponse, error) {
 	var message string
 	err := s.db.QueryRow("SELECT message FROM greetings ORDER BY created_at DESC LIMIT 1").Scan(&message)
 	if err != nil {

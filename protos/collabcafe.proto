@@ -1,0 +1,91 @@
+syntax = "proto3";
+
+package collabcafe;
+
+option go_package = ".;pb";
+
+service CollabCafeService {
+    rpc GetCollab (GetCollabRequest) returns (GetCollabResponse);
+    rpc ListCollabs (ListCollabsRequest) returns (ListCollabsResponse);
+    rpc SearchCollabs (SearchCollabsRequest) returns (SearchCollabsResponse);
+    rpc ScanSources (ScanSourcesRequest) returns (ScanSourcesResponse);
+}
+
+message Collab {
+    string id = 1;
+    string type = 2;
+    string slug = 3;
+    string posted_date = 4;
+    CollabSummary summary = 5;
+    CollabContent content = 6;
+    CollabImages images = 7;
+}
+
+message CollabSummary {
+    string thumbnail = 1;
+    string title = 2;
+    string description = 3;
+}
+
+message CollabContent {
+    string series = 1;
+    string title = 2;
+    repeated string categories = 3;
+    repeated string tags = 4;
+    CollabOfficialWebsite official_website = 5;
+    CollabSchedule schedule = 6;
+}
+
+message CollabOfficialWebsite {
+    string url = 1;
+    string text = 2;
+}
+
+message CollabSchedule {
+    repeated CollabEvent events = 1;
+}
+
+message CollabImages {
+    string header = 1;
+}
+
+message CollabEvent {
+    string location = 1;
+    string period = 2;
+    string start_date = 3;
+    string end_date = 4;
+    string map_link = 5;
+}
+
+message GetCollabRequest {
+    string id = 1;
+    string language = 2;
+}
+
+message GetCollabResponse {
+    Collab collab = 1;
+}
+
+message ListCollabsRequest {
+    string language = 1;
+}
+
+message ListCollabsResponse {
+    repeated Collab collabs = 1;
+}
+
+message SearchCollabsRequest {
+    string query = 1;
+    string language = 2;
+}
+
+message SearchCollabsResponse {
+    repeated Collab collabs = 1;
+}
+
+message ScanSourcesRequest {
+}
+
+message ScanSourcesResponse {
+    int64 num_new_collabs = 1;
+}

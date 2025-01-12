@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/ColinLarsonCA/iro2/backend/collabcafe"
 	"github.com/ColinLarsonCA/iro2/backend/greeting"
 	"github.com/ColinLarsonCA/iro2/backend/pb"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -36,14 +37,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	grpcServer := grpc.NewServer()
-	pb.RegisterGreetingServiceServer(grpcServer, greeting.NewService(db))
-	reflection.Register(grpcServer)
 	mux := runtime.NewServeMux()
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	grpcServer := grpc.NewServer()
+	pb.RegisterGreetingServiceServer(grpcServer, greeting.NewService(db))
+	pb.RegisterCollabCafeServiceServer(grpcServer, collabcafe.NewService(db))
+	reflection.Register(grpcServer)
 	err = pb.RegisterGreetingServiceHandlerFromEndpoint(ctx, mux, fmt.Sprintf("localhost:%d", grpcPort), opts)
 	if err != nil {
 		log.Fatalf("failed to register GreetingServiceHandler: %+v\n", err)
+	}
+	err = pb.RegisterCollabCafeServiceHandlerFromEndpoint(ctx, mux, fmt.Sprintf("localhost:%d", grpcPort), opts)
+	if err != nil {
+		log.Fatalf("failed to register CollabCafeServiceHandler: %+v\n", err)
 	}
 	go listenAndServe(grpcServer, grpcPort)
 	log.Println("starting http server on port", httpPort)

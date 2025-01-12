@@ -15,4 +15,3 @@ plugins:
       - generate_unbound_methods=true
   - plugin: buf.build/community/stephenh-ts-proto
     out: ../web/src/pb
-    

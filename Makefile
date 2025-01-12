@@ -6,6 +6,9 @@ be:
 web:
 	cd web; npm run dev
 
+prettier:
+	npx prettier . --write
+
 pb:
 	rm -rf api/*
 	rm -rf backend/pb/*

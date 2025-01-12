@@ -7,5 +7,5 @@ CREATE TABLE collabs (
     collab_en JSONB NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_source_url ON collabs (source_url ASC);
-CREATE INDEX source_posted_at ON collabs (source_posted_at DESC);
+CREATE UNIQUE INDEX idx_source_url ON collabs (source_url ASC);
+CREATE INDEX idx_source_posted_at ON collabs (source_posted_at DESC);

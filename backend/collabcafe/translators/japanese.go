@@ -118,6 +118,7 @@ var (
 		"期間":           "Period",
 		"特設ページ":        "Special Page",
 		"コラボカフェ":       "Collab Cafe",
+		"コンビニ":         "Convenience Store",
 		"公式サイト":        "Official Website",
 		"開催場所":         "Location",
 		"開催期間":         "Period",

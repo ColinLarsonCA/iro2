@@ -3,6 +3,8 @@ package collabcafe
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -10,7 +12,6 @@ import (
 	"github.com/ColinLarsonCA/iro2/backend/collabcafe/scrapers"
 	"github.com/ColinLarsonCA/iro2/backend/collabcafe/translators"
 	"github.com/ColinLarsonCA/iro2/backend/pb"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 )
 
@@ -27,7 +28,7 @@ func NewService(db *sql.DB) pb.CollabCafeServiceServer {
 
 func (s *service) GetCollab(ctx context.Context, req *pb.GetCollabRequest) (*pb.GetCollabResponse, error) {
 	var id string
-	err := s.db.QueryRow("SELECT id FROM collabs WHERE id = %s LIMIT 1", req.Id).Scan(&id)
+	err := s.db.QueryRow("SELECT id FROM collabs WHERE id = $1 LIMIT 1", req.Id).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
@@ -35,14 +36,31 @@ func (s *service) GetCollab(ctx context.Context, req *pb.GetCollabRequest) (*pb.
 }
 
 func (s *service) SearchCollabs(ctx context.Context, req *pb.SearchCollabsRequest) (*pb.SearchCollabsResponse, error) {
-	collabs := []*pb.Collab{}
-	// TODO(Colin): Implement search
-	return &pb.SearchCollabsResponse{Collabs: collabs}, nil
+	// TODO(Colin): Implement real search
+	res, err := s.ListCollabs(ctx, &pb.ListCollabsRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return &pb.SearchCollabsResponse{Collabs: res.GetCollabs()}, nil
+}
+
+func (s *service) ListCollabs(ctx context.Context, req *pb.ListCollabsRequest) (*pb.ListCollabsResponse, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT id, source, source_url, source_posted_at, collab_jp, collab_en, created_at FROM collabs ORDER BY source_posted_at DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	collabs, err := s.scanCollabRows(rows, req.Language)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.ListCollabsResponse{Collabs: collabs}, nil
 }
 
 type collabPair struct {
-	en *pb.Collab
-	jp *pb.Collab
+	url string
+	en  *pb.Collab
+	jp  *pb.Collab
 }
 
 func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (*pb.ScanSourcesResponse, error) {
@@ -55,6 +73,10 @@ func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (
 	}
 	collabos := []scrapers.Collabo{}
 	for _, url := range collaboCafeURLs {
+		alreadyHasCollab, _ := s.hasCollabFromSourceURL(ctx, url)
+		if alreadyHasCollab {
+			continue
+		}
 		collabo, err := s.scraper.Scrape(url, "")
 		if err != nil {
 			log.Println(err)
@@ -91,18 +113,78 @@ func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (
 			},
 		}
 		en := translators.TranslateJPCollabToEN(jp)
-		collabPairs = append(collabPairs, collabPair{en: en, jp: jp})
+		collabPairs = append(collabPairs, collabPair{url: collabo.URL, en: en, jp: jp})
 	}
 	for _, pair := range collabPairs {
-		spew.Dump(pair.en)
-		log.Println()
+		s.insertCollab(ctx, pair)
 	}
 	return &pb.ScanSourcesResponse{NumNewCollabs: int64(len(collaboCafeURLs))}, nil
 }
 
+func (s *service) hasCollabFromSourceURL(ctx context.Context, url string) (bool, error) {
+	err := s.db.QueryRowContext(ctx, "SELECT id FROM collabs WHERE source_url = $1 LIMIT 1;", url).Scan()
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (s *service) scanCollabRows(rows *sql.Rows, language string) ([]*pb.Collab, error) {
+	var jpBytes, enBytes []byte
+	var id, source, sourceURL, sourcePostedAt, createdAt string
+	collabs := []*pb.Collab{}
+	for rows.Next() {
+		err := rows.Scan(&id, &source, &sourceURL, &sourcePostedAt, &jpBytes, &enBytes, &createdAt)
+		if err != nil {
+			return nil, err
+		}
+		jp := &pb.Collab{}
+		en := &pb.Collab{}
+		fmt.Println(jpBytes)
+		err = json.Unmarshal(jpBytes, jp)
+		if err != nil {
+			return nil, err
+		}
+		err = json.Unmarshal(enBytes, en)
+		if err != nil {
+			return nil, err
+		}
+		if language == "jp" {
+			collabs = append(collabs, jp)
+		} else {
+			collabs = append(collabs, en)
+		}
+	}
+	return collabs, nil
+}
+
+func (s *service) insertCollab(ctx context.Context, collabPair collabPair) error {
+	hasCollabAlready, err := s.hasCollabFromSourceURL(ctx, collabPair.url)
+	if err != nil {
+		return err
+	}
+	if hasCollabAlready {
+		return nil
+	}
+	jp := collabPair.jp
+	en := collabPair.en
+	jpJSON, _ := json.Marshal(jp)
+	enJSON, _ := json.Marshal(en)
+	_, err = s.db.ExecContext(ctx, "INSERT INTO collabs (id, source, source_url, source_posted_at, collab_jp, collab_en) VALUES ($1, $2, $3, $4, $5, $6)",
+		en.Id, "collabo-cafe", collabPair.url, en.PostedDate, jpJSON, enJSON)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	return nil
+}
+
 func getSlug(url string) string {
-	url = strings.TrimSuffix(url, "/")
-	parts := strings.Split(url, "/")
+	trimmed := strings.TrimSuffix(url, "/")
+	parts := strings.Split(trimmed, "/")
 	return parts[len(parts)-1]
 }
 

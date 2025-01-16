@@ -91,7 +91,7 @@ func (ja *JapaneseTranslator) GoogleTranslate(text string, from string) (string,
 		Parent:             fmt.Sprintf("projects/%s/locations/global", "iro2-448003"),
 		SourceLanguageCode: "ja",
 		TargetLanguageCode: "en-US",
-		MimeType:           "text/plain", // Mime types: "text/plain", "text/html"
+		MimeType:           "text/plain",
 		Contents:           []string{text},
 	}
 

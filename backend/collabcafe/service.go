@@ -67,21 +67,17 @@ type collabPair struct {
 
 func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (*pb.ScanSourcesResponse, error) {
 	// TODO(Colin): Implement top-level scraping
-	collaboCafeURLs := []string{
-		// "https://collabo-cafe.com/events/collabo/jujutsukaisen-pop-up-store-shinjuku-marui-annex-2025/",          // pop-up store
-		// "https://collabo-cafe.com/events/collabo/dakaretai-1st-cafe-animate-ikebukuro2025/",                      // cafe
-		// "https://collabo-cafe.com/events/collabo/gyagumanga-biyori-25th-anniversary-exhibition-tokyo-osaka2025/", // art exhibit
-		// "https://collabo-cafe.com/events/collabo/zenless-campaign-family-mart2024-add-info-dry/",                 // konbini
-		// "https://collabo-cafe.com/events/collabo/sakamoto-days-pop-up-store-plaza-loft2025-add-info-lineup/",
-		"https://collabo-cafe.com/events/collabo/lycoris-recoil-gigo2025/",
+	urlsToSummaries, err := s.scraper.ScrapeHomepage()
+	if err != nil {
+		return nil, err
 	}
 	collabos := []scrapers.Collabo{}
-	for _, url := range collaboCafeURLs {
+	for url, summary := range urlsToSummaries {
 		alreadyHasCollab, _ := s.hasCollabFromSourceURL(ctx, url)
 		if alreadyHasCollab {
 			continue
 		}
-		collabo, err := s.scraper.ScrapeCollaboPage(url, "")
+		collabo, err := s.scraper.ScrapeCollaboPage(url, summary)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -98,9 +94,9 @@ func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (
 			Slug:       getSlug(collabo.URL),
 			PostedDate: collabo.PostedDate,
 			Summary: &pb.CollabSummary{
-				Thumbnail:   "",
-				Title:       collabo.Content.Title,
-				Description: "",
+				Thumbnail:   collabo.Summary.Thumbnail,
+				Title:       collabo.Summary.Title,
+				Description: collabo.Summary.Description,
 			},
 			Content: &pb.CollabContent{
 				Series:     collabo.Content.Series,
@@ -122,7 +118,7 @@ func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (
 	for _, pair := range collabPairs {
 		s.insertCollab(ctx, pair)
 	}
-	return &pb.ScanSourcesResponse{NumNewCollabs: int64(len(collaboCafeURLs))}, nil
+	return &pb.ScanSourcesResponse{NumNewCollabs: int64(len(collabPairs))}, nil
 }
 
 func (s *service) mapCollaboEvents(events []scrapers.CollaboEvent) []*pb.CollabEvent {

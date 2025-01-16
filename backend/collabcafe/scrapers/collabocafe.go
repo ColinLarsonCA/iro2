@@ -63,17 +63,41 @@ var (
 	sublocationRegex = regexp.MustCompile("【.*】")
 )
 
-func (s *CollaboCafeEventScraper) ScrapeCollaboPage(url string, summaryHTML string) (Collabo, error) {
+func (s *CollaboCafeEventScraper) ScrapeHomepage() (map[string]CollaboSummary, error) {
+	collector := colly.NewCollector(
+		colly.AllowedDomains("collabo-cafe.com"),
+	)
+	summaries := map[string]CollaboSummary{}
+	collector.OnHTML(".top-post-list", func(e *colly.HTMLElement) {
+		log.Println("found collabo list")
+		e.ForEach("article", func(i int, e *colly.HTMLElement) {
+			url := e.ChildAttr("a", "href")
+			summaries[url] = CollaboSummary{
+				Thumbnail:   e.ChildAttr("img", "src"),
+				Title:       e.ChildText(".entry-title"),
+				Description: e.ChildText(".description"),
+			}
+		})
+	})
+	err := collector.Visit("https://collabo-cafe.com/")
+	if err != nil {
+		return nil, err
+	}
+	collector.Wait()
+	return summaries, nil
+}
+
+func (s *CollaboCafeEventScraper) ScrapeCollaboPage(url string, summary CollaboSummary) (Collabo, error) {
 	collector := colly.NewCollector(
 		colly.AllowedDomains("collabo-cafe.com"),
 	)
 	c := Collabo{
 		URL:     url,
-		Summary: CollaboSummary{},
+		Summary: summary,
 		Content: CollaboContent{},
 	}
 	collector.OnHTML("#main", func(e *colly.HTMLElement) {
-		log.Println(url, "found main content")
+		log.Println(url, "found collabo page content")
 		c.PostedDate = e.ChildAttr("time", "datetime")
 		c.Content.Title = e.ChildText(".entry-title")
 		c.Content.Images.Header = e.DOM.Find(".eyecatch").First().Find("img").First().AttrOr("src", "")
@@ -95,26 +119,43 @@ func (s *CollaboCafeEventScraper) ScrapeCollaboPage(url string, summaryHTML stri
 			switch key {
 			case "公式サイト": // Official Website
 				c.Content.OfficialWebsite = OfficialWebsite{
-					Text: valueNode.Text(),
+					Text: strings.TrimSpace(valueNode.Text()),
 					URL:  stripUTMParams(valueNode.Find("a").AttrOr("href", "")),
 				}
 			case "開催場所": // Location
 				if nodeContainsMultipleDatums(valueNode) {
 					events = ensureAtLeastNEvents(events, countNodeDatums(valueNode))
-					for i, location := range strings.Split(valueNode.Text(), "\n") {
-						events[i].Location = location
-					}
+					eventIndex := 0
+					valueNode.Contents().Each(func(_ int, s *goquery.Selection) {
+						if !s.Is("br") {
+							if eventIndex < len(events) {
+								events[eventIndex].Location = strings.TrimSpace(s.Text())
+								eventIndex++
+							} else {
+								log.Println("eventIndex out of bounds when scraping locations:", url)
+							}
+						}
+					})
 				} else {
 					events[0].Location = valueNode.Text()
 				}
 			case "開催期間": // Period
 				if nodeContainsMultipleDatums(valueNode) {
 					events = ensureAtLeastNEvents(events, countNodeDatums(valueNode))
-					for i, period := range strings.Split(valueNode.Text(), "\n") {
-						period = sublocationRegex.ReplaceAllString(period, "")
-						events[i].Period = period
-						events[i].StartDate, events[i].EndDate = parseStartDateAndEndDate(events[i].Period)
-					}
+					eventIndex := 0
+					valueNode.Contents().Each(func(_ int, s *goquery.Selection) {
+						if !s.Is("br") {
+							if eventIndex < len(events) {
+								period := s.Text()
+								period = sublocationRegex.ReplaceAllString(period, "")
+								events[eventIndex].Period = strings.TrimSpace(period)
+								events[eventIndex].StartDate, events[eventIndex].EndDate = parseStartDateAndEndDate(events[eventIndex].Period)
+								eventIndex++
+							} else {
+								log.Println("eventIndex out of bounds when scraping periods:", url)
+							}
+						}
+					})
 				} else {
 					events[0].Period = valueNode.Text()
 					events[0].StartDate, events[0].EndDate = parseStartDateAndEndDate(events[0].Period)
@@ -122,9 +163,13 @@ func (s *CollaboCafeEventScraper) ScrapeCollaboPage(url string, summaryHTML stri
 			case "アクセス・地図": // Map Link
 				if nodeContainsMultipleDatums(valueNode) {
 					events = ensureAtLeastNEvents(events, countNodeDatums(valueNode))
-					valueNode.Find("a").Each(func(j int, s *goquery.Selection) {
-						if j <= i {
-							events[j].MapLink = s.AttrOr("href", "")
+					eventIndex := 0
+					valueNode.Find("a").Each(func(_ int, s *goquery.Selection) {
+						if eventIndex < len(events) {
+							events[eventIndex].MapLink = s.AttrOr("href", "")
+							eventIndex++
+						} else {
+							log.Println("eventIndex out of bounds when scraping map links:", url)
 						}
 					})
 				} else {

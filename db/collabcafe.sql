@@ -9,3 +9,8 @@ CREATE TABLE collabs (
 );
 CREATE UNIQUE INDEX idx_source_url ON collabs (source_url ASC);
 CREATE INDEX idx_source_posted_at ON collabs (source_posted_at DESC);
+
+CREATE TABLE ja_to_en_lookup (
+    ja TEXT PRIMARY KEY,
+    en TEXT NOT NULL
+);

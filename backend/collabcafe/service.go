@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -18,12 +17,15 @@ import (
 type service struct {
 	pb.UnimplementedCollabCafeServiceServer
 
-	db      *sql.DB
-	scraper *scrapers.CollaboCafeEventScraper
+	db       *sql.DB
+	japanese *translators.JapaneseTranslator
+	scraper  *scrapers.CollaboCafeEventScraper
 }
 
 func NewService(db *sql.DB) pb.CollabCafeServiceServer {
-	return &service{db: db, scraper: &scrapers.CollaboCafeEventScraper{}}
+	scraper := &scrapers.CollaboCafeEventScraper{}
+	japanese := translators.NewJapaneseTranslator(db)
+	return &service{db: db, scraper: scraper, japanese: japanese}
 }
 
 func (s *service) GetCollab(ctx context.Context, req *pb.GetCollabRequest) (*pb.GetCollabResponse, error) {
@@ -70,6 +72,7 @@ func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (
 		"https://collabo-cafe.com/events/collabo/dakaretai-1st-cafe-animate-ikebukuro2025/",                      // cafe
 		"https://collabo-cafe.com/events/collabo/gyagumanga-biyori-25th-anniversary-exhibition-tokyo-osaka2025/", // art exhibit
 		"https://collabo-cafe.com/events/collabo/zenless-campaign-family-mart2024-add-info-dry/",                 // konbini
+		"https://collabo-cafe.com/events/collabo/sakamoto-days-pop-up-store-plaza-loft2025-add-info-lineup/",
 	}
 	collabos := []scrapers.Collabo{}
 	for _, url := range collaboCafeURLs {
@@ -112,7 +115,7 @@ func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (
 				},
 			},
 		}
-		en := translators.TranslateJPCollabToEN(jp)
+		en := s.japanese.CollabToEnglish(jp)
 		collabPairs = append(collabPairs, collabPair{url: collabo.URL, en: en, jp: jp})
 	}
 	for _, pair := range collabPairs {
@@ -143,7 +146,6 @@ func (s *service) scanCollabRows(rows *sql.Rows, language string) ([]*pb.Collab,
 		}
 		jp := &pb.Collab{}
 		en := &pb.Collab{}
-		fmt.Println(jpBytes)
 		err = json.Unmarshal(jpBytes, jp)
 		if err != nil {
 			return nil, err
@@ -176,7 +178,6 @@ func (s *service) insertCollab(ctx context.Context, collabPair collabPair) error
 	_, err = s.db.ExecContext(ctx, "INSERT INTO collabs (id, source, source_url, source_posted_at, collab_jp, collab_en) VALUES ($1, $2, $3, $4, $5, $6)",
 		en.Id, "collabo-cafe", collabPair.url, en.PostedDate, jpJSON, enJSON)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	return nil

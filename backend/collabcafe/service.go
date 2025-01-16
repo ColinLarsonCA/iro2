@@ -68,11 +68,12 @@ type collabPair struct {
 func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (*pb.ScanSourcesResponse, error) {
 	// TODO(Colin): Implement top-level scraping
 	collaboCafeURLs := []string{
-		"https://collabo-cafe.com/events/collabo/jujutsukaisen-pop-up-store-shinjuku-marui-annex-2025/",          // pop-up store
-		"https://collabo-cafe.com/events/collabo/dakaretai-1st-cafe-animate-ikebukuro2025/",                      // cafe
-		"https://collabo-cafe.com/events/collabo/gyagumanga-biyori-25th-anniversary-exhibition-tokyo-osaka2025/", // art exhibit
-		"https://collabo-cafe.com/events/collabo/zenless-campaign-family-mart2024-add-info-dry/",                 // konbini
-		"https://collabo-cafe.com/events/collabo/sakamoto-days-pop-up-store-plaza-loft2025-add-info-lineup/",
+		// "https://collabo-cafe.com/events/collabo/jujutsukaisen-pop-up-store-shinjuku-marui-annex-2025/",          // pop-up store
+		// "https://collabo-cafe.com/events/collabo/dakaretai-1st-cafe-animate-ikebukuro2025/",                      // cafe
+		// "https://collabo-cafe.com/events/collabo/gyagumanga-biyori-25th-anniversary-exhibition-tokyo-osaka2025/", // art exhibit
+		// "https://collabo-cafe.com/events/collabo/zenless-campaign-family-mart2024-add-info-dry/",                 // konbini
+		// "https://collabo-cafe.com/events/collabo/sakamoto-days-pop-up-store-plaza-loft2025-add-info-lineup/",
+		"https://collabo-cafe.com/events/collabo/lycoris-recoil-gigo2025/",
 	}
 	collabos := []scrapers.Collabo{}
 	for _, url := range collaboCafeURLs {
@@ -80,7 +81,7 @@ func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (
 		if alreadyHasCollab {
 			continue
 		}
-		collabo, err := s.scraper.Scrape(url, "")
+		collabo, err := s.scraper.ScrapeCollaboPage(url, "")
 		if err != nil {
 			log.Println(err)
 			continue
@@ -111,7 +112,7 @@ func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (
 					Text: collabo.Content.OfficialWebsite.Text,
 				},
 				Schedule: &pb.CollabSchedule{
-					Events: []*pb.CollabEvent{},
+					Events: s.mapCollaboEvents(collabo.Content.Schedule.Events),
 				},
 			},
 		}
@@ -122,6 +123,24 @@ func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (
 		s.insertCollab(ctx, pair)
 	}
 	return &pb.ScanSourcesResponse{NumNewCollabs: int64(len(collaboCafeURLs))}, nil
+}
+
+func (s *service) mapCollaboEvents(events []scrapers.CollaboEvent) []*pb.CollabEvent {
+	pbEvents := []*pb.CollabEvent{}
+	for _, event := range events {
+		pbEvents = append(pbEvents, s.mapCollaboEvent(event))
+	}
+	return pbEvents
+}
+
+func (s *service) mapCollaboEvent(event scrapers.CollaboEvent) *pb.CollabEvent {
+	return &pb.CollabEvent{
+		Location:  event.Location,
+		Period:    event.Period,
+		StartDate: event.StartDate,
+		EndDate:   event.EndDate,
+		MapLink:   event.MapLink,
+	}
 }
 
 func (s *service) hasCollabFromSourceURL(ctx context.Context, url string) (bool, error) {

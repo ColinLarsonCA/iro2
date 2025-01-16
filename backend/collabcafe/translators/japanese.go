@@ -110,6 +110,7 @@ func (ja *JapaneseTranslator) CollabToEnglish(jp *pb.Collab) *pb.Collab {
 	return &pb.Collab{
 		Id:         jp.Id,
 		Type:       jp.Type,
+		Slug:       jp.Slug,
 		PostedDate: jp.PostedDate,
 		Summary: &pb.CollabSummary{
 			Thumbnail:   jp.Summary.Thumbnail,

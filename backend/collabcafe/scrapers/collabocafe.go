@@ -59,7 +59,11 @@ type Collabo struct {
 	Content    CollaboContent
 }
 
-func (s *CollaboCafeEventScraper) Scrape(url string, summaryHTML string) (Collabo, error) {
+var (
+	sublocationRegex = regexp.MustCompile("【.*】")
+)
+
+func (s *CollaboCafeEventScraper) ScrapeCollaboPage(url string, summaryHTML string) (Collabo, error) {
 	collector := colly.NewCollector(
 		colly.AllowedDomains("collabo-cafe.com"),
 	)
@@ -82,27 +86,53 @@ func (s *CollaboCafeEventScraper) Scrape(url string, summaryHTML string) (Collab
 		c.Type = findEventTypeInCategories(c.Content.Categories)
 		c.Content.Series = guessSeries(c.Content.Title, c.Content.Categories)
 		eventDetailsTable := e.DOM.Find(".table__container").First()
-		event := CollaboEvent{}
+		events := []CollaboEvent{}
 		eventDetailsTable.Find("tr").Each(func(i int, s *goquery.Selection) {
+			events = ensureAtLeastNEvents(events, 1)
 			keyNode := s.Find("th").First()
 			valueNode := s.Find("td").First()
 			key := keyNode.Text()
 			switch key {
-			case "公式サイト":
+			case "公式サイト": // Official Website
 				c.Content.OfficialWebsite = OfficialWebsite{
 					Text: valueNode.Text(),
 					URL:  stripUTMParams(valueNode.Find("a").AttrOr("href", "")),
 				}
-			case "開催場所":
-				event.Location = valueNode.Text()
-			case "開催期間":
-				event.Period = valueNode.Text()
-				event.StartDate, event.EndDate = parseStartDateAndEndDate(event.Period)
-			case "アクセス・地図":
-				event.MapLink = valueNode.Find("a").AttrOr("href", "")
+			case "開催場所": // Location
+				if nodeContainsMultipleDatums(valueNode) {
+					events = ensureAtLeastNEvents(events, countNodeDatums(valueNode))
+					for i, location := range strings.Split(valueNode.Text(), "\n") {
+						events[i].Location = location
+					}
+				} else {
+					events[0].Location = valueNode.Text()
+				}
+			case "開催期間": // Period
+				if nodeContainsMultipleDatums(valueNode) {
+					events = ensureAtLeastNEvents(events, countNodeDatums(valueNode))
+					for i, period := range strings.Split(valueNode.Text(), "\n") {
+						period = sublocationRegex.ReplaceAllString(period, "")
+						events[i].Period = period
+						events[i].StartDate, events[i].EndDate = parseStartDateAndEndDate(events[i].Period)
+					}
+				} else {
+					events[0].Period = valueNode.Text()
+					events[0].StartDate, events[0].EndDate = parseStartDateAndEndDate(events[0].Period)
+				}
+			case "アクセス・地図": // Map Link
+				if nodeContainsMultipleDatums(valueNode) {
+					events = ensureAtLeastNEvents(events, countNodeDatums(valueNode))
+					valueNode.Find("a").Each(func(j int, s *goquery.Selection) {
+						if j <= i {
+							events[j].MapLink = s.AttrOr("href", "")
+						}
+					})
+				} else {
+					events[0].MapLink = valueNode.Find("a").AttrOr("href", "")
+				}
 			}
 		})
-		c.Content.Schedule.Events = append(c.Content.Schedule.Events, event)
+		c.Content.Schedule.Events = events
 	})
 	err := collector.Visit(url)
 	if err != nil {
@@ -110,6 +140,24 @@ func (s *CollaboCafeEventScraper) Scrape(url string, summaryHTML string) (Collab
 	}
 	collector.Wait()
 	return c, nil
+}
+
+func nodeContainsMultipleDatums(node *goquery.Selection) bool {
+	return countNodeDatums(node) > 1
+}
+
+func countNodeDatums(node *goquery.Selection) int {
+	return node.Find("br").Length() + 1
+}
+
+func ensureAtLeastNEvents(events []CollaboEvent, n int) []CollaboEvent {
+	if len(events) >= n {
+		return events
+	}
+	for i := len(events); i < n; i++ {
+		events = append(events, CollaboEvent{})
+	}
+	return events
 }
 
 func stripUTMParams(url string) string {

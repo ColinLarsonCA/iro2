@@ -1,4 +1,4 @@
-import { GetCollabRequest, GetCollabResponse, SearchCollabsRequest, SearchCollabsResponse } from "../pb/collabcafe";
+import { GetCollabRequest, GetCollabResponse, ListCollabsRequest, ListCollabsResponse, SearchCollabsRequest, SearchCollabsResponse } from "../pb/collabcafe";
 import { postRequest } from "./http";
 
 export class CollabCafeService {
@@ -15,6 +15,13 @@ export class CollabCafeService {
       this.service,
       "SearchCollabs",
       SearchCollabsRequest.toJSON(request),
+    );
+  }
+  async listCollabs(request: ListCollabsRequest): Promise<ListCollabsResponse> {
+    return postRequest(
+      this.service,
+      "ListCollabs",
+      ListCollabsRequest.toJSON(request),
     );
   }
 }

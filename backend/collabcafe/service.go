@@ -38,16 +38,24 @@ func (s *service) GetCollab(ctx context.Context, req *pb.GetCollabRequest) (*pb.
 }
 
 func (s *service) SearchCollabs(ctx context.Context, req *pb.SearchCollabsRequest) (*pb.SearchCollabsResponse, error) {
-	// TODO(Colin): Implement real search
-	res, err := s.ListCollabs(ctx, &pb.ListCollabsRequest{})
+	ftsLanguage := "english"
+	if req.GetLanguage() == "ja" {
+		ftsLanguage = "japanese"
+	}
+	rows, err := s.db.QueryContext(ctx, "SELECT id, source, source_url, source_posted_at, collab_ja, collab_en, created_at FROM collabs WHERE fts_collab_en @@ websearch_to_tsquery($1, $2) ORDER BY source_posted_at DESC;", ftsLanguage, req.GetQuery())
 	if err != nil {
 		return nil, err
 	}
-	return &pb.SearchCollabsResponse{Collabs: res.GetCollabs()}, nil
+	defer rows.Close()
+	collabs, err := s.scanCollabRows(rows, req.Language)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.SearchCollabsResponse{Collabs: collabs}, nil
 }
 
 func (s *service) ListCollabs(ctx context.Context, req *pb.ListCollabsRequest) (*pb.ListCollabsResponse, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id, source, source_url, source_posted_at, collab_jp, collab_en, created_at FROM collabs ORDER BY source_posted_at DESC")
+	rows, err := s.db.QueryContext(ctx, "SELECT id, source, source_url, source_posted_at, collab_ja, collab_en, created_at FROM collabs ORDER BY source_posted_at DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +74,6 @@ type collabPair struct {
 }
 
 func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (*pb.ScanSourcesResponse, error) {
-	// TODO(Colin): Implement top-level scraping
 	urlsToSummaries, err := s.scraper.ScrapeHomepage()
 	if err != nil {
 		return nil, err
@@ -190,7 +197,7 @@ func (s *service) insertCollab(ctx context.Context, collabPair collabPair) error
 	en := collabPair.en
 	jpJSON, _ := json.Marshal(jp)
 	enJSON, _ := json.Marshal(en)
-	_, err = s.db.ExecContext(ctx, "INSERT INTO collabs (id, source, source_url, source_posted_at, collab_jp, collab_en) VALUES ($1, $2, $3, $4, $5, $6)",
+	_, err = s.db.ExecContext(ctx, "INSERT INTO collabs (id, source, source_url, source_posted_at, collab_ja, collab_en) VALUES ($1, $2, $3, $4, $5, $6)",
 		en.Id, "collabo-cafe", collabPair.url, en.PostedDate, jpJSON, enJSON)
 	if err != nil {
 		return err

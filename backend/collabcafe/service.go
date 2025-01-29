@@ -29,12 +29,19 @@ func NewService(db *sql.DB) pb.CollabCafeServiceServer {
 }
 
 func (s *service) GetCollab(ctx context.Context, req *pb.GetCollabRequest) (*pb.GetCollabResponse, error) {
-	var id string
-	err := s.db.QueryRow("SELECT id FROM collabs WHERE id = $1 LIMIT 1", req.Id).Scan(&id)
+	rows, err := s.db.QueryContext(ctx, "SELECT id, source, source_url, source_posted_at, collab_ja, collab_en, created_at FROM collabs WHERE id = $1 LIMIT 1;", req.GetId())
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetCollabResponse{Collab: &pb.Collab{Id: id}}, nil
+	defer rows.Close()
+	collabs, err := s.scanCollabRows(rows, req.Language)
+	if err != nil {
+		return nil, err
+	}
+	if len(collabs) == 0 {
+		return &pb.GetCollabResponse{}, nil
+	}
+	return &pb.GetCollabResponse{Collab: collabs[0]}, nil
 }
 
 func (s *service) SearchCollabs(ctx context.Context, req *pb.SearchCollabsRequest) (*pb.SearchCollabsResponse, error) {

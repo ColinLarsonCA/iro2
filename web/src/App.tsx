@@ -1,6 +1,7 @@
 import { AppShell, Burger } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { Home } from "./pages/Home";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { CollabPage, HomePage } from "./pages";
 
 function App() {
   const [opened, { toggle }] = useDisclosure();
@@ -21,7 +22,12 @@ function App() {
       </AppShell.Header>
       <AppShell.Navbar p="md">Navbar</AppShell.Navbar>
       <AppShell.Main>
-        <Home />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/collab/:id" element={<CollabPage />} />
+          </Routes>
+        </BrowserRouter>
       </AppShell.Main>
     </AppShell>
   );

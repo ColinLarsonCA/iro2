@@ -42,7 +42,7 @@ export function CollabCard(props: CollabCardProps) {
       </ScrollArea>
 
       <div style={{ flexGrow: 1 }} />
-      <Button color="blue" fullWidth mt="md" radius="md">
+      <Button component="a" color="blue" fullWidth mt="md" radius="md" href={`/collab/${collab.id}`}>
         Learn more
       </Button>
     </Card>

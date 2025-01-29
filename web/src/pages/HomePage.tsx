@@ -4,7 +4,7 @@ import { Container, Grid, Space, Text, TextInput } from "@mantine/core";
 import { Collab } from "../pb/collabcafe";
 import { CollabCard } from "../components/CollabCard";
 
-export function Home() {
+export function HomePage() {
   const [collabs, setCollabs] = useState<Collab[]>([]);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");

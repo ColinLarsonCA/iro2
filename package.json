@@ -1,8 +1,5 @@
 {
   "devDependencies": {
     "prettier": "3.4.2"
-  },
-  "dependencies": {
-    "dayjs": "^1.11.13"
   }
 }

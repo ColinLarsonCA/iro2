@@ -77,13 +77,20 @@ func (s *service) ListCollabs(ctx context.Context, req *pb.ListCollabsRequest) (
 type collabPair struct {
 	url string
 	en  *pb.Collab
-	jp  *pb.Collab
+	ja  *pb.Collab
 }
 
 func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (*pb.ScanSourcesResponse, error) {
-	urlsToSummaries, err := s.scraper.ScrapeHomepage()
-	if err != nil {
-		return nil, err
+	categories := []string{"cafe", "convenience-store", "pop-up-store"}
+	urlsToSummaries := map[string]scrapers.CollaboSummary{}
+	for _, category := range categories {
+		summaries, err := s.scraper.ScrapeCategory(category)
+		if err != nil {
+			log.Printf("error scraping %s: %v\n", category, err)
+		}
+		for url, summary := range summaries {
+			urlsToSummaries[url] = summary
+		}
 	}
 	collabos := []scrapers.Collabo{}
 	for url, summary := range urlsToSummaries {
@@ -102,7 +109,7 @@ func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (
 	collabPairs := []collabPair{}
 	for _, collabo := range collabos {
 		id := uuid.New().String()
-		jp := &pb.Collab{
+		ja := &pb.Collab{
 			Id:         id,
 			Type:       collabo.Type,
 			Slug:       getSlug(collabo.URL),
@@ -125,9 +132,12 @@ func (s *service) ScanSources(ctx context.Context, req *pb.ScanSourcesRequest) (
 					Events: s.mapCollaboEvents(collabo.Content.Schedule.Events),
 				},
 			},
+			Images: &pb.CollabImages{
+				Header: collabo.Content.Images.Header,
+			},
 		}
-		en := s.japanese.CollabToEnglish(jp)
-		collabPairs = append(collabPairs, collabPair{url: collabo.URL, en: en, jp: jp})
+		en := s.japanese.CollabToEnglish(ja)
+		collabPairs = append(collabPairs, collabPair{url: collabo.URL, en: en, ja: ja})
 	}
 	for _, pair := range collabPairs {
 		s.insertCollab(ctx, pair)
@@ -165,17 +175,17 @@ func (s *service) hasCollabFromSourceURL(ctx context.Context, url string) (bool,
 }
 
 func (s *service) scanCollabRows(rows *sql.Rows, language string) ([]*pb.Collab, error) {
-	var jpBytes, enBytes []byte
+	var jaBytes, enBytes []byte
 	var id, source, sourceURL, sourcePostedAt, createdAt string
 	collabs := []*pb.Collab{}
 	for rows.Next() {
-		err := rows.Scan(&id, &source, &sourceURL, &sourcePostedAt, &jpBytes, &enBytes, &createdAt)
+		err := rows.Scan(&id, &source, &sourceURL, &sourcePostedAt, &jaBytes, &enBytes, &createdAt)
 		if err != nil {
 			return nil, err
 		}
-		jp := &pb.Collab{}
+		ja := &pb.Collab{}
 		en := &pb.Collab{}
-		err = json.Unmarshal(jpBytes, jp)
+		err = json.Unmarshal(jaBytes, ja)
 		if err != nil {
 			return nil, err
 		}
@@ -183,8 +193,8 @@ func (s *service) scanCollabRows(rows *sql.Rows, language string) ([]*pb.Collab,
 		if err != nil {
 			return nil, err
 		}
-		if language == "jp" {
-			collabs = append(collabs, jp)
+		if language == "ja" {
+			collabs = append(collabs, ja)
 		} else {
 			collabs = append(collabs, en)
 		}
@@ -200,12 +210,12 @@ func (s *service) insertCollab(ctx context.Context, collabPair collabPair) error
 	if hasCollabAlready {
 		return nil
 	}
-	jp := collabPair.jp
+	ja := collabPair.ja
 	en := collabPair.en
-	jpJSON, _ := json.Marshal(jp)
+	jaJSON, _ := json.Marshal(ja)
 	enJSON, _ := json.Marshal(en)
 	_, err = s.db.ExecContext(ctx, "INSERT INTO collabs (id, source, source_url, source_posted_at, collab_ja, collab_en) VALUES ($1, $2, $3, $4, $5, $6)",
-		en.Id, "collabo-cafe", collabPair.url, en.PostedDate, jpJSON, enJSON)
+		en.Id, "collabo-cafe", collabPair.url, en.PostedDate, jaJSON, enJSON)
 	if err != nil {
 		return err
 	}

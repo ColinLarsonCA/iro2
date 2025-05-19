@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/api";
-import { Container, Grid, Space, Text, TextInput } from "@mantine/core";
+import { ActionIcon, Container, Grid, Space, Text, TextInput, Tooltip } from "@mantine/core";
 import { Collab } from "../pb/collabcafe";
 import { CollabCard } from "../components/CollabCard";
+import { IconSend2 } from "@tabler/icons-react";
 
 export function HomePage() {
+  const [exampleSearch] = useState(getExampleSearch());
   const [collabs, setCollabs] = useState<Collab[]>([]);
   const [error, setError] = useState("");
+  const [searchInProgress, setSearchInProgress] = useState("");
   const [search, setSearch] = useState("");
   const listCollabs = () => {
     api.CollabCafe.listCollabs({ language: "en" })
@@ -33,10 +36,27 @@ export function HomePage() {
         });
     }
   }, [search]);
+  const searchButton = (
+    <Tooltip label="Search">
+      <ActionIcon
+        variant="light"
+        onClick={() => {
+          setSearch(searchInProgress);
+        }}
+      >
+        <IconSend2 />
+      </ActionIcon>
+    </Tooltip>
+  )
   return (
     <Container>
       <TextInput
-        placeholder="Search"
+        style={{ maxWidth: 300 }}
+        placeholder={`Try searching for ${exampleSearch}`}
+        onChange={(event) => {
+          setSearchInProgress(event.currentTarget.value);
+        }}
+        rightSection={searchButton}
         onBlur={(event) => {
           setSearch(event.currentTarget.value);
         }}
@@ -60,4 +80,9 @@ export function HomePage() {
       </Grid>
     </Container>
   );
+}
+
+function getExampleSearch(): string {
+  const examples = ["Kuromi", "Sakamoto Days", "Sanrio", "Lawson", "Miku"];
+  return examples[Math.floor(Math.random() * examples.length)];
 }

@@ -1,6 +1,7 @@
 import { Card, Image, Group, Text, Badge, Button, ScrollArea } from "@mantine/core";
 import { Collab } from "../pb/collabcafe";
 import dayjs from "dayjs";
+import { displayDate } from "../util/dates";
 
 export interface CollabCardProps {
   collab: Collab;
@@ -32,7 +33,7 @@ export function CollabCard(props: CollabCardProps) {
 
       <Group justify="space-between" mt="md" mb="xs">
         <Text>{collab.summary?.title}</Text>
-        <Text c="dimmed">{dayjs(collab.postedDate).format("MMM DD, YYYY")}</Text>
+        <Text c="dimmed">{displayDate(collab.postedDate)}</Text>
       </Group>
 
       <ScrollArea h={200}>
@@ -42,7 +43,7 @@ export function CollabCard(props: CollabCardProps) {
       </ScrollArea>
 
       <div style={{ flexGrow: 1 }} />
-      <Button component="a" color="blue" fullWidth mt="md" radius="md" href={`/collab/${collab.id}`}>
+      <Button variant="light" component="a" color="blue" fullWidth mt="md" radius="md" href={`/collab/${collab.id}`}>
         Learn more
       </Button>
     </Card>

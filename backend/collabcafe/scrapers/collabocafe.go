@@ -63,7 +63,7 @@ var (
 	sublocationRegex = regexp.MustCompile("【.*】")
 )
 
-func (s *CollaboCafeEventScraper) ScrapeHomepage() (map[string]CollaboSummary, error) {
+func (s *CollaboCafeEventScraper) ScrapeCategory(category string) (map[string]CollaboSummary, error) {
 	collector := colly.NewCollector(
 		colly.AllowedDomains("collabo-cafe.com"),
 	)
@@ -79,7 +79,7 @@ func (s *CollaboCafeEventScraper) ScrapeHomepage() (map[string]CollaboSummary, e
 			}
 		})
 	})
-	err := collector.Visit("https://collabo-cafe.com/")
+	err := collector.Visit("https://collabo-cafe.com/events/category/" + category)
 	if err != nil {
 		return nil, err
 	}

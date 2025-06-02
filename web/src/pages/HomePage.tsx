@@ -4,14 +4,18 @@ import { ActionIcon, Container, Grid, Space, Text, TextInput, Tooltip } from "@m
 import { Collab } from "../pb/collabcafe";
 import { CollabCard } from "../components/CollabCard";
 import { IconSend2 } from "@tabler/icons-react";
+import { useSearchParams } from "react-router-dom";
 
 export function HomePage() {
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get("s") || "";
   const [exampleSearch] = useState(getExampleSearch());
   const [collabs, setCollabs] = useState<Collab[]>([]);
   const [error, setError] = useState("");
   const [searchInProgress, setSearchInProgress] = useState("");
-  const [search, setSearch] = useState("");
-  const listCollabs = () => {
+  const [search, setSearch] = useState(searchQuery || "");
+  useEffect(() => {
+    if (search === "") {
     api.CollabCafe.listCollabs({ language: "en" })
       .then((response) => {
         setCollabs(response.collabs);
@@ -19,13 +23,6 @@ export function HomePage() {
       .catch((error) => {
         setError(error.message);
       });
-  };
-  useEffect(() => {
-    listCollabs();
-  }, []);
-  useEffect(() => {
-    if (search === "") {
-      listCollabs();
     } else {
       api.CollabCafe.searchCollabs({ language: "en", query: search })
         .then((response) => {
@@ -52,6 +49,7 @@ export function HomePage() {
     <Container>
       <TextInput
         style={{ maxWidth: 300 }}
+        defaultValue={search}
         placeholder={`Try searching for ${exampleSearch}`}
         onChange={(event) => {
           setSearchInProgress(event.currentTarget.value);

@@ -10,12 +10,13 @@ export interface CollabCardProps {
 export function CollabCard(props: CollabCardProps) {
   const { collab } = props;
   console.log(collab);
-  const postedRecently = dayjs().diff(dayjs(collab.postedDate), 'day') <= 7;
+  const postedRecently = dayjs().diff(dayjs(collab.postedDate), 'day') <= 3;
+  const thumbnailUrl = collab.summary?.thumbnail || "https://raw.githubusercontent.com/mantinedev/mantine/master/.demo/images/bg-8.png";
   return (
     <Card shadow="sm" padding="lg" radius="md" withBorder style={{ height: "100%" }}>
       <Card.Section style={{ position: 'relative' }}>
         <Image
-          src="https://raw.githubusercontent.com/mantinedev/mantine/master/.demo/images/bg-8.png"
+          src={thumbnailUrl}
           height={160}
           alt="Norway"
         />

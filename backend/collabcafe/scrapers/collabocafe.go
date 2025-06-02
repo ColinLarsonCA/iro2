@@ -4,11 +4,13 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"time"
 
 	neturl "net/url"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly"
+	"github.com/tebeka/selenium"
 )
 
 type CollaboCafeEventScraper struct {
@@ -63,27 +65,127 @@ var (
 	sublocationRegex = regexp.MustCompile("【.*】")
 )
 
+const (
+	seleniumURL     = "http://selenium:4444/wd/hub"
+	categoryPageURL = "https://collabo-cafe.com/events/category/"
+)
+
 func (s *CollaboCafeEventScraper) ScrapeCategory(category string) (map[string]CollaboSummary, error) {
-	collector := colly.NewCollector(
-		colly.AllowedDomains("collabo-cafe.com"),
-	)
-	summaries := map[string]CollaboSummary{}
-	collector.OnHTML(".top-post-list", func(e *colly.HTMLElement) {
-		log.Println("found collabo list")
-		e.ForEach("article", func(i int, e *colly.HTMLElement) {
-			url := e.ChildAttr("a", "href")
-			summaries[url] = CollaboSummary{
-				Thumbnail:   e.ChildAttr("img", "src"),
-				Title:       e.ChildText(".entry-title"),
-				Description: e.ChildText(".description"),
-			}
-		})
-	})
-	err := collector.Visit("https://collabo-cafe.com/events/category/" + category)
+	browserCapabilities := selenium.Capabilities{
+		"browserName": "chrome",
+	}
+	wd, err := selenium.NewRemote(browserCapabilities, seleniumURL)
 	if err != nil {
 		return nil, err
 	}
-	collector.Wait()
+	defer wd.Quit()
+	if err := wd.SetPageLoadTimeout(30 * time.Second); err != nil {
+		return nil, err
+	}
+	if err := wd.SetImplicitWaitTimeout(30 * time.Second); err != nil {
+		return nil, err
+	}
+	if err := wd.Get(categoryPageURL + category); err != nil {
+		return nil, err
+	}
+	time.Sleep(3 * time.Second)
+	script := `
+	return (function() {
+		return new Promise((resolve) => {
+			let scrollHeight = document.body.scrollHeight;
+			let scrollStep = Math.floor(scrollHeight / 10);
+			let scrollPos = 0;
+			
+			function scroll() {
+				window.scrollTo(0, scrollPos);
+				scrollPos += scrollStep;
+				
+				if (scrollPos >= scrollHeight) {
+					resolve();
+				} else {
+					setTimeout(scroll, 300);
+				}
+			}
+			
+			scroll();
+		});
+	})();
+	`
+
+	if _, err := wd.ExecuteScriptAsync(script, nil); err != nil {
+		log.Println("Warning: Error during scroll script execution:", err)
+	}
+	time.Sleep(2 * time.Second)
+	articles, err := wd.FindElements(selenium.ByCSSSelector, ".top-post-list article")
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("found collabo list with", len(articles), "items")
+	summaries := map[string]CollaboSummary{}
+
+	for _, article := range articles {
+		linkElement, err := article.FindElement(selenium.ByCSSSelector, "a")
+		if err != nil {
+			log.Println("Warning: Could not find link element:", err)
+			continue
+		}
+
+		url, err := linkElement.GetAttribute("href")
+		if err != nil {
+			log.Println("Warning: Could not get href attribute:", err)
+			continue
+		}
+
+		imgElement, err := article.FindElement(selenium.ByCSSSelector, "img")
+		if err != nil {
+			log.Println("Warning: Could not find image element:", err)
+			continue
+		}
+
+		thumbnail, err := imgElement.GetAttribute("src")
+		if err != nil {
+			log.Println("Warning: Could not get src attribute:", err)
+			continue
+		}
+
+		if strings.Contains(thumbnail, "placeholder") || strings.Contains(thumbnail, "dummy") {
+			dataSrc, err := imgElement.GetAttribute("data-src")
+			if err == nil && dataSrc != "" {
+				thumbnail = dataSrc
+			}
+		}
+
+		titleElement, err := article.FindElement(selenium.ByCSSSelector, ".entry-title")
+		if err != nil {
+			log.Println("Warning: Could not find title element:", err)
+			continue
+		}
+
+		title, err := titleElement.Text()
+		if err != nil {
+			log.Println("Warning: Could not get title text:", err)
+			continue
+		}
+
+		descElement, err := article.FindElement(selenium.ByCSSSelector, ".description")
+		if err != nil {
+			log.Println("Warning: Could not find description element:", err)
+			continue
+		}
+
+		desc, err := descElement.Text()
+		if err != nil {
+			log.Println("Warning: Could not get description text:", err)
+			continue
+		}
+
+		summaries[url] = CollaboSummary{
+			Thumbnail:   thumbnail,
+			Title:       title,
+			Description: desc,
+		}
+	}
 	return summaries, nil
 }
 

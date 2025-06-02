@@ -1,14 +1,17 @@
 import {
+  Anchor,
   Badge,
+  Button,
   Container,
   Grid,
   Group,
   JsonInput,
+  NavLink,
   Stack,
   Text,
   Title,
 } from "@mantine/core";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/api";
 import { useEffect, useState } from "react";
 import { Collab, CollabSchedule } from "../pb/collabcafe";
@@ -22,6 +25,7 @@ interface DateRange {
 }
 
 export function CollabPage() {
+  const navigate = useNavigate();
   const { id } = useParams();
   const [collab, setCollab] = useState<Collab | undefined>(undefined);
   useEffect(() => {
@@ -40,11 +44,23 @@ export function CollabPage() {
   return (
     <Container>
       <Stack>
+        <Anchor href="/" variant="subtle" size="xs">
+          Back to list
+        </Anchor>
         <Text>Posted: {displayDate(collab?.postedDate)}</Text>
         <Title>{collab?.content?.title}</Title>
         <Group>
           <Badge color="blue">Series: {collab?.content?.series}</Badge>
           {dateRangeStr && <Badge color="green">{dateRangeStr}</Badge>}
+        </Group>
+        <Group gap="xs">
+          {collab?.content?.tags?.map((tag) => (
+            <Badge key={tag} color="gray" onClick={() => {
+              navigate(`/?s=${tag}`)
+            }}>
+              {tag}
+            </Badge>
+          ))}
         </Group>
         {officialWebsite && (
           <Text>
@@ -59,7 +75,7 @@ export function CollabPage() {
           <Grid>
             {events.filter((e) => e.location).map((event) => (
               <Grid.Col span={{ base: 12, md: 6, lg: 4 }}>
-                <EventCard event={event} />
+                <EventCard event={event} key={event.location} />
               </Grid.Col>
             ))}
           </Grid>

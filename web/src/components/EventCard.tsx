@@ -8,13 +8,30 @@ export interface EventCardProps {
 
 export function EventCard(props: EventCardProps) {
   const { event } = props;
+  const from = event.startDate ? displayDate(event.startDate) : "";
+  const to = event.endDate ? displayDate(event.endDate) : "";
+  const location = event.location || "";
   return (
     <Card shadow="sm" padding="lg" radius="md" withBorder style={{ height: "100%" }}>
-      <Stack>
-        <Text>Location: {event.location}</Text>
-        {event.startDate && <Text>From: {displayDate(event.startDate)}</Text>}
-        {event.endDate && <Text>To: {displayDate(event.endDate)}</Text>}
+      <Stack gap="xs">
+        {location && (
+          <Text>
+            Location: <a href={googleMapsSearchLink(location)} target="_blank" rel="noreferrer">{location}</a>
+          </Text>
+        )}
+        <Text>Period: {event.period}</Text>
+        {from && <Text>From: {from}</Text>}
+        {to && <Text>To: {to}</Text>}
+        {event.mapLink && (
+          <Text>
+            <a href={event.mapLink} target="_blank" rel="noreferrer">{event.mapLink}</a>
+          </Text>
+        )}
       </Stack>
     </Card>
   );
+}
+
+function googleMapsSearchLink(location: string): string {
+  return `https://maps.google.com/?q=${encodeURIComponent(location)}`;
 }

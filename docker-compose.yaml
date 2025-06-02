@@ -32,3 +32,8 @@ services:
       - .env
     volumes:
       - ./backend:/app
+
+  selenium:
+    image: selenium/standalone-chromium:latest
+    ports:
+      - "4444:4444"
